@@ -18,9 +18,7 @@ def random_project(X, out_dim=DEFAULT_OUT_DIM, binary=False):
 
     # binary hashing
     if binary:
-        X_new[X_new > 0] = 1
-        X_new[X_new < 0] = 0
-        X_new = X_new.astype(np.bool)
+        X_new = binarize(X_new)
 
     # (outDim, D) to (D, outDim)
     random_mat = transformer.components_.transpose()
@@ -29,15 +27,30 @@ def random_project(X, out_dim=DEFAULT_OUT_DIM, binary=False):
     
 
 def project(X, random_mat, binary=False):
+    is_1d = False
     if len(X.shape) == 1:
+        is_1d = True
         X = X.reshape((1, -1))
 
-    assert X.shape[1] == random_mat.shape[0], 'feature dim must be equal to random_mat.shape[0]'
+    assert X.shape[1] == random_mat.shape[0], 'feature dim(%d) must be equal to random_mat.shape[0](%d)' % (X.shape[1], random_mat.shape[0])
 
     Y = X.dot(random_mat)
 
+    if binary:
+        print 'binarize'
+        Y = binarize(Y)
+
+    if is_1d:
+        Y = Y.reshape((Y.size))
+
     return Y
     
+
+def binarize(X):
+    X[X > 0] = 1
+    X[X < 0] = 0
+    X_new = X.astype(np.bool)
+    return X_new
 
 
 if __name__ == '__main__':
@@ -50,6 +63,7 @@ if __name__ == '__main__':
             help='a .hkl file containing original NxD feature in data["feature"], where data = hkl.load(...)')
     parser.add_argument('--binary', action='store_true', help='whether to do binary hashing')
     parser.add_argument('-D', '--dim', default=DEFAULT_OUT_DIM, help='output feature dimension (default: %(default)s)')
+    parser.add_argument('-M', '--mat', help='Apply existing mat (.npy) as the projection matrix. Ignore -D,--dim.')
 
     args = parser.parse_args()
     
@@ -62,7 +76,14 @@ if __name__ == '__main__':
         data = dict()
         X = np.random.random((100, 10000))
 
-    Xrp, random_mat = random_project(X, out_dim=args.dim, binary=args.binary)
+    # use previously generated mat
+    if args.mat:
+        random_mat = np.load(args.mat)
+        Xrp = project(X, random_mat, binary=args.binary)
+    else:
+        print 
+        Xrp, random_mat = random_project(X, out_dim=args.dim, binary=args.binary)
+
     print 'random_mat:', random_mat.shape
     
     # output data
